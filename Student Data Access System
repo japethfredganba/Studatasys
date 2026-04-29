@@ -1,0 +1,636 @@
+import tkinter as tk
+from tkinter import messagebox
+import sqlite3
+import hashlib
+
+# Database setup
+conn = sqlite3.connect("sda.db")
+cursor = conn.cursor()
+
+# Students table
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS students 
+(
+    student_ID INTEGER PRIMARY KEY 
+    CHECK(length(student_ID) <= 4),
+    student_name TEXT NOT NULL 
+    CHECK(length(student_name) <= 30)
+);
+""")
+
+# Semester 1 table
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS semester1 
+(
+    student_ID INTEGER PRIMARY KEY,
+    CompTiA INTEGER 
+    CHECK(CompTiA BETWEEN 0 AND 100), 
+    C_Programming INTEGER 
+    CHECK(C_Programming BETWEEN 0 AND 100), 
+    Excel INTEGER 
+    CHECK(Excel BETWEEN 0 AND 100), 
+    Entrepreneurship INTEGER 
+    CHECK(Entrepreneurship BETWEEN 0 AND 100),
+    paid_amount1 REAL 
+    CHECK(paid_amount1 >= 0),
+    outstanding_amount1 REAL 
+    CHECK(outstanding_amount1 >= 0),
+    FOREIGN KEY(student_ID) 
+    REFERENCES 
+    students(student_ID) ON DELETE CASCADE
+);
+""")
+
+# Semester 2 table
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS semester2 
+(
+    student_ID INTEGER PRIMARY KEY,
+    Python INTEGER 
+    CHECK(Python BETWEEN 0 AND 100), 
+    SQL INTEGER 
+    CHECK(SQL BETWEEN 0 AND 100), 
+    Data_Wrangling INTEGER 
+    CHECK(Data_Wrangling BETWEEN 0 AND 100), 
+    Data_Visualization INTEGER 
+    CHECK(Data_Visualization BETWEEN 0 AND 100),
+    paid_amount2 REAL 
+    CHECK(paid_amount2 >= 0),
+    outstanding_amount2 REAL 
+    CHECK(outstanding_amount2 >= 0),
+    FOREIGN KEY(student_ID) 
+    REFERENCES 
+    students(student_ID) ON DELETE CASCADE
+);
+""")
+
+# Admin table
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS admin (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    password TEXT NOT NULL
+);
+""")
+
+cursor.execute("SELECT * FROM admin")
+if cursor.fetchone() is None:
+    default_password = hashlib.sha256("admin123".encode()).hexdigest()
+    cursor.execute("INSERT INTO admin (password) VALUES (?)",
+                   (default_password,))
+    conn.commit()
+
+#GUI functions
+def fetch_data():
+    sid = entry_id.get().strip()
+    name = entry_name.get().strip()
+
+    if not sid or not name:
+        messagebox.showerror("Error",
+                             "Please enter your Name and ID")
+        return
+
+    cursor.execute("SELECT student_ID,"
+                   " student_name " "FROM "
+                   "students WHERE "
+                   "student_ID=? AND student_name=?",
+                   (sid, name))
+    student = cursor.fetchone()
+
+    if student:
+        open_second_window(sid, name)
+    else:
+        messagebox.showerror("Error",
+                             "Student not found")
+
+def open_second_window(sid, name):
+    root.withdraw()
+    second = tk.Toplevel(root)
+    second.title("Semester")
+    second.geometry("300x220")
+    second.configure(bg="#008B8B")
+
+    def back():
+        second.destroy()
+        root.deiconify()
+
+    tk.Label(second, text=f"Welcome {name}\n Select Semester ",
+             font=("Arial", 12, "bold"),bg="#008B8B", fg="white").pack(pady=5)
+
+    tk.Button(second, text="Semester 1",
+              command=lambda: show_semester1(sid,name),
+              bg="#00FFFF").pack(pady=5)
+
+    tk.Button(second, text="Semester 2",
+              command=lambda: show_semester2(sid, name),
+              bg="#00FFFF").pack(pady=5)
+
+    tk.Button(second,text=" << ",command=back,bg="#00FFFF").pack(pady=5)
+
+def show_semester1(sid, name):
+    cursor.execute("SELECT * FROM semester1 WHERE student_ID=?", (sid,))
+    data = cursor.fetchone()
+
+    sem1 = tk.Toplevel(root)
+    sem1.title("Semester 1")
+    sem1.geometry("400x350")
+    sem1.configure(bg="#008B8B")
+
+    def close_sem1():
+        sem1.destroy()
+
+    # Header
+    tk.Label(
+        sem1,
+        text=f"Student Name: {name} | ID: {sid}",
+        font=("Arial", 12, "bold"),
+        bg="#008B8B", fg="white"
+    ).pack(pady=5)
+
+    tk.Label(
+        sem1,
+        text="Academy Record",
+        font=("Arial", 10, "bold"),
+        bg="#008B8B", fg="black"
+    ).pack()
+
+    if data:
+        subjects = ["CompTiA", "C Programming", "Excel", "Entrepreneurship"]
+        scores = data[1:5]
+        paid = data[5]
+        outstanding = data[6]
+
+        # Grid layout for subjects and scores
+        frame_scores = tk.Frame(sem1, bg="#008B8B")
+        frame_scores.pack(pady=5)
+
+        for i, subject in enumerate(subjects):
+            tk.Label(frame_scores, text=subject, font=("Arial", 10),
+                     bg="#008B8B", fg="white", width=15, anchor="w").grid(row=i, column=0, padx=5, pady=2)
+            tk.Label(frame_scores, text=str(scores[i]), font=("Arial", 10, "bold"),
+                     bg="#008B8B", fg="white", width=5).grid(row=i, column=1, padx=5, pady=2)
+
+        # Financial record
+        tk.Label(sem1, text="Financial Record", font=("Arial", 10, "bold"),
+                 bg="#008B8B", fg="black").pack(pady=5)
+        tk.Label(sem1, text=f"Paid Amount: K{paid}", font=("Arial", 10, "bold"),
+                 bg="#008B8B", fg="light green").pack()
+        tk.Label(sem1, text=f"Outstanding Amount: K{outstanding}", font=("Arial", 10, "bold"),
+                 bg="#008B8B", fg="red").pack()
+    else:
+        tk.Label(sem1, text="No Semester 1 data found",
+                 bg="#008B8B", fg="white").pack()
+
+    tk.Button(sem1, text="<<", command=close_sem1, bg="#00FFFF").pack(pady=5)
+
+
+def show_semester2(sid, name):
+    cursor.execute("SELECT * FROM semester2 WHERE student_ID=?", (sid,))
+    data = cursor.fetchone()
+
+    sem2 = tk.Toplevel(root)
+    sem2.title("Semester 2")
+    sem2.geometry("400x350")
+    sem2.configure(bg="#008B8B")
+
+    def close_sem2():
+        sem2.destroy()
+
+    # Header
+    tk.Label(
+        sem2,
+        text=f"Student Name: {name} | ID: {sid}",
+        font=("Arial", 12, "bold"),
+        bg="#008B8B", fg="white"
+    ).pack(pady=5)
+
+    tk.Label(
+        sem2,
+        text="Academy Record",
+        font=("Arial", 10, "bold"),
+        bg="#008B8B", fg="black"
+    ).pack()
+
+    if data:
+        subjects = ["Python", "SQL", "Data Wrangling", "Data Visualization"]
+        scores = data[1:5]
+        paid = data[5]
+        outstanding = data[6]
+
+        # Grid layout for subjects and scores
+        frame_scores = tk.Frame(sem2, bg="#008B8B")
+        frame_scores.pack(pady=5)
+
+        for i, subject in enumerate(subjects):
+            tk.Label(frame_scores, text=subject, font=("Arial", 10),
+                     bg="#008B8B", fg="white", width=15, anchor="w").grid(row=i, column=0, padx=5, pady=2)
+            tk.Label(frame_scores, text=str(scores[i]), font=("Arial", 10, "bold"),
+                     bg="#008B8B", fg="white", width=5).grid(row=i, column=1, padx=5, pady=2)
+
+        # Financial record
+        tk.Label(sem2, text="Financial Record", font=("Arial", 10, "bold"),
+                 bg="#008B8B", fg="black").pack(pady=5)
+        tk.Label(sem2, text=f"Paid Amount: K{paid}", font=("Arial", 10, "bold"),
+                 bg="#008B8B", fg="light green").pack()
+        tk.Label(sem2, text=f"Outstanding Amount: K{outstanding}", font=("Arial", 10, "bold"),
+                 bg="#008B8B", fg="red").pack()
+    else:
+        tk.Label(sem2, text="No Semester 2 data found",
+                 bg="#008B8B", fg="white").pack()
+
+    tk.Button(sem2, text="<<", command=close_sem2, bg="#00FFFF").pack(pady=5)
+
+def close():
+    confirm = messagebox.askyesno("Close",
+                                  "Are you sure you want to "
+                                  "Close this system?")
+    if confirm:
+        root.destroy()
+
+#Admin Lock New Student
+def ask_admin_password(action):
+    win = tk.Toplevel(root)
+    win.title("Admin Login")
+    win.geometry("270x150")
+    win.configure(bg="#008B8B")
+    root.withdraw()
+
+    (tk.Label(win, text="Enter Admin Password",bg="#008B8B", fg="white").
+     pack(pady=5))
+    entry_pass = tk.Entry(win, show="*", width=25, bg="light Blue")
+    entry_pass.pack(pady=5)
+
+    def verify():
+        cursor.execute("SELECT password FROM admin WHERE id=1")
+        correct_hash = cursor.fetchone()[0]
+        entered_hash = hashlib.sha256(entry_pass.get().encode()).hexdigest()
+
+        if entered_hash == correct_hash:
+            win.destroy()
+            action()
+            root.withdraw()
+        else:
+            messagebox.showerror("Error",
+                                 "Incorrect Admin Password")
+            win.destroy()
+            root.deiconify()
+
+    tk.Button(win, text="Enter", command=verify, bg="#00FFFF").pack(pady=10)
+
+#New Students Function
+def new_student():
+    new_win = tk.Toplevel(root)
+    new_win.title("New Student")
+    new_win.geometry("600x400")
+    new_win.configure(bg="#008B8B")
+
+    def bck():
+        new_win.destroy()
+        root.deiconify()
+
+    tk.Label(new_win, text="New Student Form", font=("Arial", 11, "bold"),
+                        bg="#008B8B").grid(row=0, column=0, columnspan=2, pady=10)
+
+    (tk.Label(new_win, text="Student Name",bg="#008B8B", fg="white").
+    grid(row=1, column=0,pady=2))
+    entry_name = tk.Entry(new_win, width=20,bg="light blue")
+    entry_name.grid(row=1, column=1)
+
+    (tk.Label(new_win, text="Student ID",bg="#008B8B", fg="white").
+    grid(row=2, column=0))
+    entry_id = tk.Entry(new_win, width=20,bg="light blue")
+    entry_id.grid(row=2, column=1)
+
+    (tk.Label(new_win, text="Semester 1", font=("Arial",11,"bold"),bg="#008B8B").
+    grid(row=3, column=0, pady=4))
+    (tk.Label(new_win, text="Academy Record", font=("Arial",9,"bold"),bg="#008B8B").
+    grid(row=4, column=0))
+
+    # Semester 1 scores
+    subjects1 = ["CompTiA", "C Programming", "Excel", "Entrepreneurship"]
+    entries1 = {}
+    for i, subj in enumerate(subjects1):
+        (tk.Label(new_win, text=subj,bg="#008B8B", fg="white").
+         grid(row=5+i, column=0, sticky="w"))
+        e = tk.Entry(new_win, width=5,bg="light blue")
+        e.grid(row=5+i, column=1,pady=2)
+        entries1[subj] = e
+
+    (tk.Label(new_win, text="Financial Record", font=("Arial",9,"bold"),bg="#008B8B").
+     grid(row=9, column=0))
+
+    entry_paid1 = tk.Entry(new_win, width=10,bg="light blue")
+    entry_out1 = tk.Entry(new_win, width=10,bg="light blue")
+    (tk.Label(new_win, text="Paid Amount ",bg="#008B8B", fg="white").
+     grid(row=10, column=0, sticky="w",pady=2))
+    entry_paid1.grid(row=10, column=1)
+    (tk.Label(new_win, text="Outstanding Amount ",bg="#008B8B", fg="white").
+     grid(row=11, column=0, sticky="w"))
+    entry_out1.grid(row=11, column=1)
+
+    (tk.Label(new_win, text="Semester 2",font=("Arial",11,"bold"),bg="#008B8B").
+     grid(row=3, column=2,pady=4))
+
+    # Semester 2 scores
+    (tk.Label(new_win, text="Academy Record", font=("Arial",9,"bold"),bg="#008B8B").
+     grid(row=4, column=2))
+
+    subjects2 = ["Python", "SQL", "Data Wrangling", "Data Visualization"]
+    entries2 = {}
+    for i, subj in enumerate(subjects2):
+        (tk.Label(new_win, text=subj,bg="#008B8B", fg="white").
+         grid(row=5 + i, column=2, sticky="w"))
+        e = tk.Entry(new_win, width=5,bg="light blue")
+        e.grid(row=5 + i, column=3, pady=2)
+        entries2[subj] = e
+
+    (tk.Label(new_win, text="Financial Record", font=("Arial", 9, "bold"), bg="#008B8B").
+     grid(row=9, column=2))
+
+    entry_paid2 = tk.Entry(new_win, width=10,bg="light blue")
+    entry_out2 = tk.Entry(new_win, width=10,bg="light blue")
+    (tk.Label(new_win, text="Paid Amount ",bg="#008B8B", fg="white").
+     grid(row=10, column=2, sticky="w",pady=2))
+    entry_paid2.grid(row=10, column=3)
+    (tk.Label(new_win, text="Outstanding Amount ",bg="#008B8B", fg="white").
+     grid(row=11, column=2, sticky="w"))
+    entry_out2.grid(row=11, column=3)
+
+    def save_student():
+        sid = entry_id.get().strip()
+        name = entry_name.get().strip()
+
+        if not sid or not name:
+            messagebox.showerror("Error", "Student ID and Name required")
+            return
+
+        try:
+            cursor.execute("INSERT INTO students VALUES (?, ?)", (sid, name))
+
+            cursor.execute("""
+                    INSERT INTO semester1 VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (sid,
+                      int(entries1["CompTiA"].get() or 0),
+                      int(entries1["C Programming"].get() or 0),
+                      int(entries1["Excel"].get() or 0),
+                      int(entries1["Entrepreneurship"].get() or 0),
+                      float(entry_paid1.get() or 0),
+                      float(entry_out1.get() or 0)))
+
+            cursor.execute("""
+                    INSERT INTO semester2 VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (sid,
+                      int(entries2["Python"].get() or 0),
+                      int(entries2["SQL"].get() or 0),
+                      int(entries2["Data Wrangling"].get() or 0),
+                      int(entries2["Data Visualization"].get() or 0),
+                      float(entry_paid2.get() or 0),
+                      float(entry_out2.get() or 0)))
+
+            conn.commit()
+            messagebox.showinfo("Success",
+                                f"Student {name} added successfully")
+            new_win.destroy()
+            root.deiconify()
+        except sqlite3.IntegrityError:
+            messagebox.showerror("Error",
+                                 "Student ID already exists")
+
+    (tk.Button(new_win, text="Save Student", command=save_student, bg="#00FFFF").
+     grid(row=13, column=0,pady=10,padx=5))
+    (tk.Button(new_win,text="Exit", command=bck, bg="#00FFFF").
+     grid(row=13, column=1))
+
+def update_student():
+    search_win = tk.Toplevel(root)
+    search_win.title("Search Student")
+    search_win.geometry("330x200")
+    search_win.configure(bg="#008B8B")
+    # Header label
+    tk.Label(search_win, text="Search Student Records", font=("Arial", 10, "bold"),
+             bg="#008B8B").grid(row=0, column=0, columnspan=2, pady=10)
+
+    (tk.Label(search_win, text="Student Name", bg="#008B8B", fg="white").
+     grid(row=1, column=0, pady=5, sticky="w"))
+    entry_name = tk.Entry(search_win, width=25)
+    entry_name.grid(row=1, column=1, pady=5)
+
+    (tk.Label(search_win, text="Student ID", bg="#008B8B", fg="white").
+     grid(row=2, column=0, pady=5, sticky="w"))
+    entry_id = tk.Entry(search_win, width=25)
+    entry_id.grid(row=2, column=1, pady=5)
+
+    def search_student():
+        sid = entry_id.get().strip()
+        name = entry_name.get().strip()
+
+        if not sid or not name:
+            messagebox.showerror("Error",
+                                 "Student Name and ID required")
+            return
+
+        cursor.execute("SELECT * FROM students WHERE student_ID=? AND student_name=?",
+                       (sid, name))
+        student = cursor.fetchone()
+
+        if not student:
+            messagebox.showerror("Error",
+                                 "Student not found")
+            return
+        search_win.destroy()
+        open_update_form(sid, name)
+
+    def xit():
+        search_win.destroy()
+        root.deiconify()
+    (tk.Button(search_win, text="Search", command=search_student, bg="#00FFFF").
+     grid(row=3, column=0, columnspan=1, pady=10, padx=5))
+
+    (tk.Button(search_win, text="Exit ", command=xit, bg="#00FFFF").
+     grid(row=3, column=0, columnspan=2, pady=10, padx=5))
+
+
+def open_update_form(sid, name):
+    upd_win = tk.Toplevel(root)
+    upd_win.title("Update Student Form")
+    upd_win.geometry("600x400")
+    upd_win.configure(bg="#008B8B")
+
+    # Header
+    tk.Label(upd_win, text="Update Student Form", font=("Arial", 12, "bold"),
+             bg="#008B8B").grid(row=0, column=0, columnspan=2, pady=10)
+
+    # Show student info
+    tk.Label(upd_win, text=f"Name:{name}\nID: {sid}", font=("Arial", 11, "bold"),
+             bg="#008B8B").grid(row=1, column=0, columnspan=2, pady=2)
+
+    # Retrieve semester data
+    cursor.execute("SELECT * FROM semester1 WHERE student_ID=?", (sid,))
+    sem1 = cursor.fetchone()
+    cursor.execute("SELECT * FROM semester2 WHERE student_ID=?", (sid,))
+    sem2 = cursor.fetchone()
+
+    # Semester 1 section
+    if sem1:
+        (tk.Label(upd_win, text="Semester 1", font=("Arial", 10, "bold"), bg="#008B8B").
+        grid(row=2, column=0, columnspan=2, pady=5))
+        (tk.Label(upd_win, text="Academy Record", font=("Arial", 9, "bold"), bg="#008B8B").
+        grid(row=3, column=0))
+
+        subjects1 = ["CompTiA", "C Programming", "Excel", "Entrepreneurship"]
+        entries1 = {}
+        for i, subj in enumerate(subjects1):
+            tk.Label(upd_win, text=subj, bg="#008B8B", fg="white").grid(row=4+i, column=0, sticky="w")
+            e = tk.Entry(upd_win, width=10)
+            e.insert(0, sem1[1+i])
+            e.grid(row=4+i, column=1, pady=2)
+            entries1[subj] = e
+
+        (tk.Label(upd_win, text="Financial Record", font=("Arial", 9, "bold"), bg="#008B8B").
+        grid(row=8, column=0))
+        (tk.Label(upd_win, text="Paid Amount (Sem1)", bg="#008B8B", fg="white").
+        grid(row=9, column=0, sticky="w"))
+        entry_paid1 = tk.Entry(upd_win, width=10)
+        entry_paid1.insert(0, sem1[5])
+        entry_paid1.grid(row=9, column=1)
+
+        (tk.Label(upd_win, text="Outstanding Amount (Sem1)", bg="#008B8B", fg="white").
+        grid(row=10, column=0, sticky="w"))
+        entry_out1 = tk.Entry(upd_win, width=10)
+        entry_out1.insert(0, sem1[6])
+        entry_out1.grid(row=10, column=1)
+
+    # Semester 2 section
+    if sem2:
+        (tk.Label(upd_win, text="Semester 2", font=("Arial", 10, "bold"), bg="#008B8B").
+        grid(row=2, column=3, columnspan=2, pady=5))
+        (tk.Label(upd_win, text="Academy Record", font=("Arial", 9, "bold"), bg="#008B8B").
+        grid(row=3, column=3))
+
+        subjects2 = ["Python", "SQL", "Data Wrangling", "Data Visualization"]
+        entries2 = {}
+        for i, subj in enumerate(subjects2):
+            tk.Label(upd_win, text=subj, bg="#008B8B", fg="white").grid(row=4+i, column=3, sticky="w")
+            e = tk.Entry(upd_win, width=10)
+            e.insert(0, sem2[1+i])
+            e.grid(row=4+i, column=4, pady=2)
+            entries2[subj] = e
+
+        (tk.Label(upd_win, text="Financial Record", font=("Arial", 9, "bold"), bg="#008B8B").
+         grid(row=8, column=3))
+        (tk.Label(upd_win, text="Paid Amount (Sem2)", bg="#008B8B", fg="white").
+         grid(row=9, column=3, sticky="w"))
+        entry_paid2 = tk.Entry(upd_win, width=10)
+        entry_paid2.insert(0, sem2[5])
+        entry_paid2.grid(row=9, column=4)
+
+        (tk.Label(upd_win, text="Outstanding Amount (Sem2)", bg="#008B8B", fg="white").
+         grid(row=10, column=3, sticky="w"))
+        entry_out2 = tk.Entry(upd_win, width=10)
+        entry_out2.insert(0, sem2[6])
+        entry_out2.grid(row=10, column=4)
+
+    # Save and Delete buttons
+    def save_updates():
+        if sem1:
+            cursor.execute("""UPDATE semester1 SET 
+            CompTiA=?,
+            C_Programming=?,
+            Excel=?,
+            Entrepreneurship=?,
+            paid_amount1=?,
+            outstanding_amount1=? 
+            WHERE student_ID=?""",
+                           (int(entries1["CompTiA"].get() or 0),
+                            int(entries1["C Programming"].get() or 0),
+                            int(entries1["Excel"].get() or 0),
+                            int(entries1["Entrepreneurship"].get() or 0),
+                            float(entry_paid1.get() or 0),
+                            float(entry_out1.get() or 0),
+                            sid))
+
+        if sem2:
+            cursor.execute("""UPDATE semester2 SET 
+            Python=?, 
+            SQL=?,
+            Data_Wrangling=?,
+            Data_Visualization=?,    
+            paid_amount2=?,
+            outstanding_amount2=?
+            WHERE student_ID=?""",
+                           (int(entries2["Python"].get() or 0),
+                            int(entries2["SQL"].get() or 0),
+                            int(entries2["Data Wrangling"].get() or 0),
+                            int(entries2["Data Visualization"].get() or 0),
+                            float(entry_paid2.get() or 0),
+                            float(entry_out2.get() or 0),
+                            sid))
+
+        conn.commit()
+        messagebox.showinfo("Success", "Student successfully updated")
+        upd_win.destroy()
+        root.deiconify()
+    def delete_student():
+        confirm = messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this student's data?")
+        if confirm:
+            cursor.execute("DELETE FROM students WHERE student_ID=?",
+                           (sid,))
+            cursor.execute("DELETE FROM semester1 WHERE student_ID=?",
+                           (sid,))
+            cursor.execute("DELETE FROM semester2 WHERE student_ID=?",
+                           (sid,))
+            conn.commit()
+            messagebox.showinfo("Deleted",
+                                "Student deleted successfully")
+            upd_win.destroy()
+            root.deiconify()
+    (tk.Button(upd_win, text="Save Update", command=save_updates, bg="#00FFFF").
+    grid(row=20, column=0, pady=20))
+    (tk.Button(upd_win, text="Delete Student", command=delete_student, bg="#00FFFF").
+    grid(row=20, column=1, pady=20))
+
+
+
+#Main GUI
+root = tk.Tk()
+root.title("Student Data Access System")
+root.geometry("370x420")
+root.configure(bg="#008B8B")
+
+header = tk.Label(root, text="🎓𝐒𝐭𝐮𝐝𝐞𝐧𝐭 𝐃𝐚𝐭𝐚 𝐀𝐜𝐜𝐞𝐬𝐬\n𝐒𝐲𝐬𝐭𝐞𝐦", font=("Arial",17, "bold"),
+                bg="light blue",fg="black")
+header.pack(fill="x",pady=10)
+
+
+tk.Label(root, text="Student Login", font=("Arial", 12, "bold"),
+                bg="#008B8B", fg="white").pack(pady=5)
+
+tk.Label(root, text="Student Name", bg="#008B8B", fg="white").pack()
+entry_name = tk.Entry(root, width=20,bg="light Blue")
+entry_name.pack(pady=4)
+
+tk.Label(root, text="Student ID", bg="#008B8B", fg="white").pack()
+entry_id = tk.Entry(root, width=20, show="*", bg="light Blue")
+entry_id.pack(pady=4)
+
+tk.Button(root, text="View Records",
+          command=fetch_data,
+          bg="#00FFFF").pack(pady=8)
+
+tk.Label(root, text="Admin", font=("Arial", 12, "bold"), bg="#008B8B", fg="white"
+                 ).pack(pady=5)
+
+
+tk.Button(root, text="New Student ",
+          command=lambda: ask_admin_password(new_student),
+          bg="#00FFFF").pack(pady=7)
+
+tk.Button(root, text="Update/Delete",
+          command=lambda: ask_admin_password(update_student),
+          bg="#00FFFF").pack(pady=7)
+
+tk.Button(root, text="Close",font=("Arial",8,"bold"), command=close,
+          bg="#B22222",fg="White").pack(pady=7)
+
+root.mainloop()
+conn.close()
+
